@@ -16,4 +16,6 @@ $ nodejs >= 18
 
 $ npm install
 
+// 运行前可自行修改conf.yml中的端口配置和账号密码
+
 $ npm run start:prod
