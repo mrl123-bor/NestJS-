@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8030:8030"  # 将容器内的 8030 端口映射到主机的 8030 端口
+      - "3000:3000"  # 将容器内的 3000 端口映射到主机的 3000 端口
+    restart: always
+    environment:
+      - NODE_ENV=production

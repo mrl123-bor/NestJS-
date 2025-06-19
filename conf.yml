@@ -1,0 +1,6 @@
+auth:
+  username: admin
+  password: '123456'
+token: ''
+lastActivity: ''
+port: 8030
