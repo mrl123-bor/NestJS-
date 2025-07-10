@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # 暴露应用端口，这里使用 conf.yml 里的端口或默认 3000
-EXPOSE 8030 3000
+EXPOSE 8030
 
 # 启动应用
 CMD ["npm", "run", "start:prod"]
