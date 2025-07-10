@@ -1,23 +1,31 @@
-# 使用 Node.js 基础镜像
-FROM node:24.4.0-alpine
+# ----------- Builder stage ------------
+FROM node:18-bullseye AS builder
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制 package.json 和 package-lock.json
 COPY package*.json ./
 
-# 安装依赖
-RUN npm install
+RUN apt-get update && \
+    apt-get install -y python3 make g++ && \
+    npm install --verbose && \
+    npm rebuild sqlite3 --build-from-source --verbose && \
+    apt-get remove -y python3 make g++ && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# 复制项目文件
 COPY . .
 
-# 构建项目
-RUN npm run build
+# ----------- Production stage ------------
+FROM node:18-bullseye
 
-# 暴露应用端口，这里使用 conf.yml 里的端口或默认 3000
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/conf.yml ./conf.yml
+COPY --from=builder /app/Vue ./Vue
+COPY package*.json ./
+
 EXPOSE 8030
 
-# 启动应用
 CMD ["npm", "run", "start:prod"]
