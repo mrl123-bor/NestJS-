@@ -42,6 +42,12 @@ let SyncTaskController = class SyncTaskController {
     async clearSyncTaskLogs() {
         return this.syncTaskService.clearSyncTaskLogs();
     }
+    async deleteBatchSyncTasks(ids) {
+        return this.syncTaskService.deleteBatchSyncTasks(ids);
+    }
+    async updateBatchSyncTasks(ids, updateData) {
+        return this.syncTaskService.updateBatchSyncTasks(ids, updateData);
+    }
     async deleteSyncTask(id) {
         return this.syncTaskService.deleteSyncTask(id);
     }
@@ -101,6 +107,21 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], SyncTaskController.prototype, "clearSyncTaskLogs", null);
+__decorate([
+    (0, common_1.Delete)('batch'),
+    __param(0, (0, common_1.Body)('ids')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Array]),
+    __metadata("design:returntype", Promise)
+], SyncTaskController.prototype, "deleteBatchSyncTasks", null);
+__decorate([
+    (0, common_1.Patch)('batch'),
+    __param(0, (0, common_1.Body)('ids')),
+    __param(1, (0, common_1.Body)('updateData')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Array, Object]),
+    __metadata("design:returntype", Promise)
+], SyncTaskController.prototype, "updateBatchSyncTasks", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),

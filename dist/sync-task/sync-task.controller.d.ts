@@ -1,5 +1,6 @@
 import { SyncTaskService } from './sync-task.service';
 import { CreateBatchSyncTaskDto } from './create-batch-sync-task.dto';
+import { SyncTaskEntity } from './sync-task.entity';
 export declare class SyncTaskController {
     private readonly syncTaskService;
     constructor(syncTaskService: SyncTaskService);
@@ -24,9 +25,9 @@ export declare class SyncTaskController {
         code: number;
         data: {
             items: {
-                sourceDatabase: import("./sync-task.entity").SyncTaskEntity["sourceDatabase"];
-                targetDatabase: import("./sync-task.entity").SyncTaskEntity["targetDatabase"];
-                tasks: import("./sync-task.entity").SyncTaskEntity[];
+                sourceDatabase: SyncTaskEntity["sourceDatabase"];
+                targetDatabase: SyncTaskEntity["targetDatabase"];
+                tasks: SyncTaskEntity[];
             }[];
             total: number;
             page: number;
@@ -54,6 +55,14 @@ export declare class SyncTaskController {
             remainingCount: number;
         };
     }>;
+    deleteBatchSyncTasks(ids: number[]): Promise<{
+        code: number;
+        message: string;
+    }>;
+    updateBatchSyncTasks(ids: number[], updateData: Partial<SyncTaskEntity>): Promise<{
+        code: number;
+        message: string;
+    }>;
     deleteSyncTask(id: number): Promise<{
         code: number;
         message: string;
@@ -65,7 +74,7 @@ export declare class SyncTaskController {
             items: {
                 syncTime: string;
                 id: number;
-                task: import("./sync-task.entity").SyncTaskEntity;
+                task: SyncTaskEntity;
                 data: string;
                 content: string;
                 sourceDatabase: string;

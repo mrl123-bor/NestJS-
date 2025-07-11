@@ -40,6 +40,10 @@ __decorate([
     __metadata("design:type", Boolean)
 ], SyncTaskEntity.prototype, "isSyncEnabled", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], SyncTaskEntity.prototype, "syncAllFieldsExceptUpdatedAt", void 0);
+__decorate([
     (0, typeorm_1.Column)('simple-array', { nullable: true }),
     __metadata("design:type", Array)
 ], SyncTaskEntity.prototype, "incrementalFields", void 0);

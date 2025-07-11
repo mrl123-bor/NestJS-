@@ -6,6 +6,7 @@ export declare class SyncTaskEntity {
     selectedTable: string;
     selectedFields: string[];
     isSyncEnabled: boolean;
+    syncAllFieldsExceptUpdatedAt: boolean;
     incrementalFields: string[];
     lastSyncValues: {
         values: Record<string, string>;

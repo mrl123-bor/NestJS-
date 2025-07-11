@@ -129,4 +129,12 @@ export declare class SyncTaskService implements OnModuleInit {
             failedTasks: any[];
         };
     }>;
+    deleteBatchSyncTasks(ids: number[]): Promise<{
+        code: number;
+        message: string;
+    }>;
+    updateBatchSyncTasks(ids: number[], updateData: Partial<SyncTaskEntity>): Promise<{
+        code: number;
+        message: string;
+    }>;
 }

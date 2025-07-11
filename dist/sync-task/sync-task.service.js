@@ -467,6 +467,24 @@ WHERE table_name = $1`, [table]);
     async incrementalSync(sourceConnection, targetConnection, sourceType, targetType, table, fields, task, primaryKey) {
         try {
             const incrementalField = 'updated_at';
+            const syncAllFields = task.syncAllFieldsExceptUpdatedAt || false;
+            if (syncAllFields) {
+                let allFields = [];
+                if (sourceType === 'mysql') {
+                    const [fieldsInfo] = await sourceConnection.query(`DESCRIBE ${table}`);
+                    allFields = fieldsInfo.map((field) => field.Field);
+                }
+                else if (sourceType === 'postgres') {
+                    const result = await sourceConnection.query(`SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = $1`, [table]);
+                    allFields = result.rows.map((row) => row.column_name);
+                }
+                fields = allFields.filter(f => f !== incrementalField);
+                if (!fields.includes(primaryKey)) {
+                    fields.push(primaryKey);
+                }
+            }
             if (!fields.includes(incrementalField)) {
                 fields.push(incrementalField);
             }
@@ -722,6 +740,7 @@ WHERE table_name = $1`, [table]);
                     isSyncEnabled: true,
                     isIncrementalSync: true,
                     incrementalFields: incrementalFields,
+                    syncAllFieldsExceptUpdatedAt: true,
                     isExecuting: true,
                     lastSyncTime: new Date()
                 };
@@ -755,6 +774,68 @@ WHERE table_name = $1`, [table]);
                 existingTasks,
                 failedTasks
             }
+        };
+    }
+    async deleteBatchSyncTasks(ids) {
+        let deletedCount = 0;
+        for (const id of ids) {
+            try {
+                this.removeCronJob(id);
+                const result = await this.dataSource.transaction(async (manager) => {
+                    await manager.delete(sync_task_log_entity_1.SyncTaskLogEntity, { task: { id } });
+                    return manager.delete(sync_task_entity_1.SyncTaskEntity, { id });
+                });
+                if (result.affected && result.affected > 0) {
+                    deletedCount++;
+                }
+            }
+            catch (error) {
+                this.logger.error(`批量删除任务时，删除任务 ${id} 失败: ${error.message}`, error.stack);
+            }
+        }
+        if (deletedCount > 0) {
+            return {
+                code: 200,
+                message: `成功批量删除 ${deletedCount} 个同步任务`
+            };
+        }
+        return {
+            code: 404,
+            message: '未找到要删除的同步任务'
+        };
+    }
+    async updateBatchSyncTasks(ids, updateData) {
+        let updatedCount = 0;
+        for (const id of ids) {
+            try {
+                this.removeCronJob(id);
+                const result = await this.dataSource.transaction(async (manager) => {
+                    return manager.update(sync_task_entity_1.SyncTaskEntity, { id }, updateData);
+                });
+                if (result.affected && result.affected > 0) {
+                    updatedCount++;
+                    const updatedTask = await this.syncTaskRepository.findOne({
+                        where: { id },
+                        relations: ['sourceDatabase', 'targetDatabase']
+                    });
+                    if (updatedTask?.executionTime && updatedTask.isSyncEnabled) {
+                        this.addCronJob(updatedTask);
+                    }
+                }
+            }
+            catch (error) {
+                this.logger.error(`批量修改任务时，修改任务 ${id} 失败: ${error.message}`, error.stack);
+            }
+        }
+        if (updatedCount > 0) {
+            return {
+                code: 200,
+                message: `成功批量修改 ${updatedCount} 个同步任务`
+            };
+        }
+        return {
+            code: 404,
+            message: '未找到要修改的同步任务'
         };
     }
 };
