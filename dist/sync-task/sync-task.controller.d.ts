@@ -68,7 +68,7 @@ export declare class SyncTaskController {
         message: string;
         affected: number;
     }>;
-    getSyncTaskLogs(page?: number, limit?: number, taskId?: number): Promise<{
+    getSyncTaskLogs(page?: number, limit?: number, taskId?: number, success?: string): Promise<{
         code: number;
         data: {
             items: {

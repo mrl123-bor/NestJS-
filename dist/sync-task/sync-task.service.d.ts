@@ -12,6 +12,8 @@ export declare class SyncTaskService implements OnModuleInit {
     private readonly dataSource;
     private readonly schedulerRegistry;
     private readonly logger;
+    private mysqlConnectionPools;
+    private postgresConnectionPools;
     constructor(syncTaskRepository: Repository<SyncTaskEntity>, syncTaskLogRepository: Repository<SyncTaskLogEntity>, dataSourceService: DataSourceService, dataSource: DataSource, schedulerRegistry: SchedulerRegistry);
     onModuleInit(): Promise<void>;
     private addCronJob;
@@ -44,6 +46,8 @@ export declare class SyncTaskService implements OnModuleInit {
         message: string;
         affected: number;
     }>;
+    private getConnectionKey;
+    private getOrCreateConnectionPool;
     syncData(task: SyncTaskEntity): Promise<void>;
     getPrimaryKey(connection: any, dbType: string, tableName: string): Promise<string | null>;
     ensureUpdatedAtFieldExists(connection: any, dbType: string, table: string): Promise<boolean>;
@@ -77,7 +81,7 @@ export declare class SyncTaskService implements OnModuleInit {
     }>;
     private logSyncTask;
     private formatDateTime;
-    getSyncTaskLogs(page?: number, limit?: number, taskId?: number): Promise<{
+    getSyncTaskLogs(page?: number, limit?: number, taskId?: number, success?: boolean): Promise<{
         code: number;
         data: {
             items: {

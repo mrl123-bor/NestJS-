@@ -51,8 +51,9 @@ let SyncTaskController = class SyncTaskController {
     async deleteSyncTask(id) {
         return this.syncTaskService.deleteSyncTask(id);
     }
-    async getSyncTaskLogs(page = 1, limit = 10, taskId) {
-        return this.syncTaskService.getSyncTaskLogs(page, limit, taskId);
+    async getSyncTaskLogs(page = 1, limit = 10, taskId, success) {
+        const successBoolean = success === 'true' ? true : success === 'false' ? false : undefined;
+        return this.syncTaskService.getSyncTaskLogs(page, limit, taskId, successBoolean);
     }
 };
 exports.SyncTaskController = SyncTaskController;
@@ -134,8 +135,9 @@ __decorate([
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('taskId')),
+    __param(3, (0, common_1.Query)('success')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Number, Number]),
+    __metadata("design:paramtypes", [Number, Number, Number, String]),
     __metadata("design:returntype", Promise)
 ], SyncTaskController.prototype, "getSyncTaskLogs", null);
 exports.SyncTaskController = SyncTaskController = __decorate([

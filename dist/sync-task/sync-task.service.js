@@ -32,6 +32,8 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
         this.dataSource = dataSource;
         this.schedulerRegistry = schedulerRegistry;
         this.logger = new common_1.Logger(SyncTaskService_1.name);
+        this.mysqlConnectionPools = new Map();
+        this.postgresConnectionPools = new Map();
     }
     async onModuleInit() {
         const tasks = await this.syncTaskRepository.find({
@@ -48,7 +50,17 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
         const job = new cron_1.CronJob(task.executionTime, async () => {
             const updatedTask = await this.syncTaskRepository.findOne({ where: { id: task.id } });
             if (!updatedTask || !updatedTask.isExecuting) {
-                this.logger.log(`任务 ${task.id} 已暂停，跳过执行`);
+                const jobName = `syncTask-${task.id}`;
+                if (this.schedulerRegistry.doesExist('cron', jobName)) {
+                    try {
+                        const job = this.schedulerRegistry.getCronJob(jobName);
+                        job.stop();
+                        this.logger.log(`任务 ${task.id} 的定时任务已停止`);
+                    }
+                    catch (error) {
+                        this.logger.error(`停止任务 ${task.id} 的定时任务失败: ${error.message}`);
+                    }
+                }
                 return;
             }
             try {
@@ -176,6 +188,45 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
             };
         });
     }
+    getConnectionKey(dbConfig) {
+        return `${dbConfig.address}:${dbConfig.port}:${dbConfig.database}`;
+    }
+    getOrCreateConnectionPool(dbConfig) {
+        const key = this.getConnectionKey(dbConfig);
+        if (dbConfig.type === 'mysql') {
+            if (!this.mysqlConnectionPools.has(key)) {
+                const pool = (0, promise_1.createPool)({
+                    host: dbConfig.address,
+                    port: parseInt(dbConfig.port),
+                    user: dbConfig.username,
+                    password: dbConfig.password,
+                    database: dbConfig.database,
+                    waitForConnections: true,
+                    connectionLimit: 10,
+                    queueLimit: 0
+                });
+                this.mysqlConnectionPools.set(key, pool);
+            }
+            return this.mysqlConnectionPools.get(key);
+        }
+        else if (dbConfig.type === 'postgres') {
+            if (!this.postgresConnectionPools.has(key)) {
+                const pool = new pg_1.Pool({
+                    host: dbConfig.address,
+                    port: parseInt(dbConfig.port),
+                    user: dbConfig.username,
+                    password: dbConfig.password,
+                    database: dbConfig.database,
+                    max: 10,
+                    idleTimeoutMillis: 30000,
+                    connectionTimeoutMillis: 2000
+                });
+                this.postgresConnectionPools.set(key, pool);
+            }
+            return this.postgresConnectionPools.get(key);
+        }
+        throw new Error(`不支持的数据库类型: ${dbConfig.type}`);
+    }
     async syncData(task) {
         try {
             const updatedTask = await this.syncTaskRepository.findOne({
@@ -196,29 +247,8 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
             let sourceConnection;
             let targetConnection;
             try {
-                if (sourceDB.type === 'mysql') {
-                    sourceConnection = await (0, promise_1.createConnection)({
-                        host: sourceDB.address,
-                        port: parseInt(sourceDB.port),
-                        user: sourceDB.username,
-                        password: sourceDB.password,
-                        database: sourceDB.database,
-                    });
-                    this.logger.log(`已成功连接到源MySQL数据库: ${sourceDB.database}`);
-                }
-                else if (sourceDB.type === 'postgres') {
-                    sourceConnection = new pg_1.Pool({
-                        host: sourceDB.address,
-                        port: parseInt(sourceDB.port),
-                        user: sourceDB.username,
-                        password: sourceDB.password,
-                        database: sourceDB.database,
-                    });
-                    this.logger.log(`已成功连接到源PostgreSQL数据库: ${sourceDB.database}`);
-                }
-                else {
-                    throw new Error(`不支持的源数据库类型: ${sourceDB.type}`);
-                }
+                sourceConnection = this.getOrCreateConnectionPool(sourceDB);
+                this.logger.log(`已获取源数据库连接池: ${sourceDB.database}`);
                 const sourceTableExists = await this.checkTableExists(sourceConnection, sourceDB.type, table, sourceDB.database);
                 this.logger.log(`源表 ${table} 是否存在: ${sourceTableExists}`);
                 if (!sourceTableExists) {
@@ -226,29 +256,8 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
                 }
                 const sourceUpdatedAtExists = await this.ensureUpdatedAtFieldExists(sourceConnection, sourceDB.type, table);
                 this.logger.log(`源表 ${table} 的updated_at字段状态: ${sourceUpdatedAtExists ? '存在' : '不存在(已添加)'}`);
-                if (targetDB.type === 'mysql') {
-                    targetConnection = await (0, promise_1.createConnection)({
-                        host: targetDB.address,
-                        port: parseInt(targetDB.port),
-                        user: targetDB.username,
-                        password: targetDB.password,
-                        database: targetDB.database,
-                    });
-                    this.logger.log(`已成功连接到目标MySQL数据库: ${targetDB.database}`);
-                }
-                else if (targetDB.type === 'postgres') {
-                    targetConnection = new pg_1.Pool({
-                        host: targetDB.address,
-                        port: parseInt(targetDB.port),
-                        user: targetDB.username,
-                        password: targetDB.password,
-                        database: targetDB.database,
-                    });
-                    this.logger.log(`已成功连接到目标PostgreSQL数据库: ${targetDB.database}`);
-                }
-                else {
-                    throw new Error(`不支持的目标数据库类型: ${targetDB.type}`);
-                }
+                targetConnection = this.getOrCreateConnectionPool(targetDB);
+                this.logger.log(`已获取目标数据库连接池: ${targetDB.database}`);
                 const targetTableExists = await this.checkTableExists(targetConnection, targetDB.type, table, targetDB.database);
                 this.logger.log(`目标表 ${table} 是否存在: ${targetTableExists}`);
                 if (!targetTableExists) {
@@ -290,20 +299,6 @@ let SyncTaskService = SyncTaskService_1 = class SyncTaskService {
                 }
             }
             finally {
-                if (sourceConnection) {
-                    if (sourceDB.type === 'mysql')
-                        await sourceConnection.end();
-                    if (sourceDB.type === 'postgres')
-                        await sourceConnection.end?.();
-                    this.logger.log(`已关闭源数据库连接`);
-                }
-                if (targetConnection) {
-                    if (targetDB.type === 'mysql')
-                        await targetConnection.end();
-                    if (targetDB.type === 'postgres')
-                        await targetConnection.end?.();
-                    this.logger.log(`已关闭目标数据库连接`);
-                }
             }
         }
         catch (error) {
@@ -586,8 +581,12 @@ WHERE table_name = $1`, [table]);
         const pad = (n) => n.toString().padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     }
-    async getSyncTaskLogs(page = 1, limit = 10, taskId) {
+    async getSyncTaskLogs(page = 1, limit = 10, taskId, success) {
         const where = taskId ? { task: { id: taskId } } : {};
+        if (success !== undefined) {
+            where.success = success;
+        }
+        this.logger.log(`查询同步任务日志的条件: ${JSON.stringify(where)}`);
         const [logs, total] = await this.syncTaskLogRepository.findAndCount({
             where,
             relations: ['task'],
@@ -810,7 +809,15 @@ WHERE table_name = $1`, [table]);
             try {
                 this.removeCronJob(id);
                 const result = await this.dataSource.transaction(async (manager) => {
-                    return manager.update(sync_task_entity_1.SyncTaskEntity, { id }, updateData);
+                    if (updateData.executionTime) {
+                        return manager.update(sync_task_entity_1.SyncTaskEntity, { id }, updateData);
+                    }
+                    else {
+                        const Mista = {
+                            isExecuting: updateData.isExecuting
+                        };
+                        return manager.update(sync_task_entity_1.SyncTaskEntity, { id }, Mista);
+                    }
                 });
                 if (result.affected && result.affected > 0) {
                     updatedCount++;
